@@ -7,6 +7,21 @@ if (!process.env.DATABASE_URL) {
 
 export const sql = neon(process.env.DATABASE_URL || "");
 
+// Em serverless, várias requisições podem chegar ao mesmo tempo e tentar
+// criar as tabelas simultaneamente. "CREATE TABLE IF NOT EXISTS" não é
+// perfeitamente atômico contra isso no Postgres, então em corrida ele pode
+// devolver um erro de chave duplicada no catálogo (23505). Isso é inofensivo:
+// significa que a tabela já existe (foi criada pela outra requisição
+// concorrente), então só ignoramos esse erro específico.
+async function safeExec(run: () => Promise<unknown>) {
+  try {
+    await run();
+  } catch (err: any) {
+    if (err?.code === "23505") return;
+    throw err;
+  }
+}
+
 export type SiteConfig = {
   id: number;
   logo_url: string | null;
@@ -46,7 +61,8 @@ const DEFAULT_CONFIG: Omit<SiteConfig, "id"> = {
 };
 
 export async function ensureSchema() {
-  await sql`
+  await safeExec(
+    () => sql`
     CREATE TABLE IF NOT EXISTS site_config (
       id INT PRIMARY KEY DEFAULT 1,
       logo_url TEXT,
@@ -66,8 +82,10 @@ export async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       CONSTRAINT single_row CHECK (id = 1)
     );
-  `;
-  await sql`
+  `
+  );
+  await safeExec(
+    () => sql`
     CREATE TABLE IF NOT EXISTS submissions (
       id SERIAL PRIMARY KEY,
       field1_value TEXT,
@@ -77,14 +95,17 @@ export async function ensureSchema() {
       user_agent TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-  `;
-  await sql`
+  `
+  );
+  await safeExec(
+    () => sql`
     CREATE TABLE IF NOT EXISTS rate_limit_log (
       id SERIAL PRIMARY KEY,
       ip TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-  `;
+  `
+  );
 }
 
 export async function getConfig(): Promise<SiteConfig> {

@@ -4,8 +4,16 @@ import { getConfig, updateConfig } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const config = await getConfig();
-  return NextResponse.json(config);
+  try {
+    const config = await getConfig();
+    return NextResponse.json(config);
+  } catch (err) {
+    console.error("Erro ao buscar config admin:", err);
+    return NextResponse.json(
+      { error: "Não foi possível carregar a configuração." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PUT(req: NextRequest) {

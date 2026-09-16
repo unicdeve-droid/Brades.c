@@ -29,15 +29,19 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     fetch("/api/config")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Erro ao carregar.");
+        return data;
+      })
       .then(setConfig)
-      .catch(() => setError("Não foi possível carregar a página."));
+      .catch(() => setError("Não foi possível carregar a página. Tente recarregar."));
   }, []);
 
   if (!config) {
     return (
-      <div className="min-h-dvh flex items-center justify-center text-sm text-ink/50">
-        Carregando…
+      <div className="min-h-dvh flex items-center justify-center text-sm text-ink/50 px-6 text-center">
+        {error ?? "Carregando…"}
       </div>
     );
   }
