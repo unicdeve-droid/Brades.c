@@ -10,7 +10,7 @@ export default function AprovadoPage() {
   } | null>(null);
 
   useEffect(() => {
-    fetch("/api/config")
+    fetch("/api/config", { cache: "no-store" })
       .then((r) => r.json())
       .then((c) =>
         setData({

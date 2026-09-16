@@ -6,7 +6,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const config = await getConfig();
-    return NextResponse.json(config);
+    return NextResponse.json(config, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      },
+    });
   } catch (err) {
     console.error("Erro ao buscar config admin:", err);
     return NextResponse.json(
