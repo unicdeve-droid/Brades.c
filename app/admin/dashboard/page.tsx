@@ -83,7 +83,9 @@ export default function DashboardPage() {
     setUploading(true);
     setUploadError(null);
     try {
-      const authRes = await fetch("/api/admin/upload-auth");
+      const authRes = await fetch("/api/admin/upload-auth", {
+        cache: "no-store",
+      });
       const auth = await authRes.json();
       if (!authRes.ok) throw new Error(auth.error || "Falha na autenticação.");
 
