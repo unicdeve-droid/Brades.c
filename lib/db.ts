@@ -110,31 +110,38 @@ export async function ensureSchema() {
 
 export async function getConfig(): Promise<SiteConfig> {
   await ensureSchema();
-  const rows = await sql`SELECT * FROM site_config WHERE id = 1`;
-  if (rows.length === 0) {
-    await sql`
-      INSERT INTO site_config (
-        id, logo_url, title,
-        field1_label, field1_format,
-        field2_label, field2_format,
-        field3_label, field3_format,
-        paragraphs, footer_text,
-        success_title, success_message,
-        rate_limit_max, rate_limit_window_seconds
-      ) VALUES (
-        1, ${DEFAULT_CONFIG.logo_url}, ${DEFAULT_CONFIG.title},
-        ${DEFAULT_CONFIG.field1_label}, ${DEFAULT_CONFIG.field1_format},
-        ${DEFAULT_CONFIG.field2_label}, ${DEFAULT_CONFIG.field2_format},
-        ${DEFAULT_CONFIG.field3_label}, ${DEFAULT_CONFIG.field3_format},
-        ${JSON.stringify(DEFAULT_CONFIG.paragraphs)}, ${DEFAULT_CONFIG.footer_text},
-        ${DEFAULT_CONFIG.success_title}, ${DEFAULT_CONFIG.success_message},
-        ${DEFAULT_CONFIG.rate_limit_max}, ${DEFAULT_CONFIG.rate_limit_window_seconds}
-      )
-      ON CONFLICT (id) DO NOTHING;
-    `;
-    const inserted = await sql`SELECT * FROM site_config WHERE id = 1`;
-    return inserted[0] as unknown as SiteConfig;
+  // INSERT ... ON CONFLICT ... RETURNING é uma operação atômica única:
+  // ou cria a linha padrão (primeira vez) ou não faz nada e mesmo assim
+  // devolve a linha já existente — sem o risco de duas requisições
+  // concorrentes "pisarem no pé" uma da outra num fluxo de vários passos.
+  const rows = await sql`
+    INSERT INTO site_config (
+      id, logo_url, title,
+      field1_label, field1_format,
+      field2_label, field2_format,
+      field3_label, field3_format,
+      paragraphs, footer_text,
+      success_title, success_message,
+      rate_limit_max, rate_limit_window_seconds
+    ) VALUES (
+      1, ${DEFAULT_CONFIG.logo_url}, ${DEFAULT_CONFIG.title},
+      ${DEFAULT_CONFIG.field1_label}, ${DEFAULT_CONFIG.field1_format},
+      ${DEFAULT_CONFIG.field2_label}, ${DEFAULT_CONFIG.field2_format},
+      ${DEFAULT_CONFIG.field3_label}, ${DEFAULT_CONFIG.field3_format},
+      ${JSON.stringify(DEFAULT_CONFIG.paragraphs)}, ${DEFAULT_CONFIG.footer_text},
+      ${DEFAULT_CONFIG.success_title}, ${DEFAULT_CONFIG.success_message},
+      ${DEFAULT_CONFIG.rate_limit_max}, ${DEFAULT_CONFIG.rate_limit_window_seconds}
+    )
+    ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
+    RETURNING *;
+  `;
+
+  if (!rows[0]) {
+    throw new Error(
+      "Não foi possível obter a configuração do site (linha vazia inesperada)."
+    );
   }
+
   return rows[0] as unknown as SiteConfig;
 }
 
