@@ -61,22 +61,25 @@ export default function DashboardPage() {
     setConfig(next);
   }
 
-  async function persist() {
-    if (!config) return;
+  async function persist(overrideConfig?: SiteConfig) {
+    const toSave = overrideConfig ?? config;
+    if (!toSave) return;
     setSaving(true);
     const res = await fetch("/api/admin/config", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(config),
+      body: JSON.stringify(toSave),
     });
     setSaving(false);
     if (res.ok) {
       setSavedAt(Date.now());
       setTimeout(() => setSavedAt(null), 2000);
     }
+    return res.ok;
   }
 
   async function handleLogoUpload(file: File) {
+    if (!config) return;
     setUploading(true);
     setUploadError(null);
     try {
@@ -100,7 +103,16 @@ export default function DashboardPage() {
       const uploaded = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(uploaded.message || "Falha no upload.");
 
-      await save({ logo_url: uploaded.url });
+      // Já salva a logo direto no banco, sem depender do botão "Salvar
+      // alterações" — assim que o upload termina, a logo já vale pro site.
+      const merged = { ...config, logo_url: uploaded.url as string };
+      setConfig(merged);
+      const ok = await persist(merged);
+      if (!ok) {
+        setUploadError(
+          "A logo subiu, mas não deu pra salvar no site. Clique em Salvar alterações."
+        );
+      }
     } catch (err: any) {
       setUploadError(err.message || "Erro ao subir a logo.");
     } finally {
@@ -344,7 +356,7 @@ export default function DashboardPage() {
 
             <div className="sticky bottom-0 pt-4 pb-2 bg-ink/95 backdrop-blur -mx-6 px-6 border-t border-white/10">
               <button
-                onClick={persist}
+                onClick={() => persist()}
                 disabled={saving}
                 className="w-full rounded-full bg-okgreen hover:bg-okgreendark disabled:opacity-50 text-white font-semibold py-3 transition-colors"
               >
